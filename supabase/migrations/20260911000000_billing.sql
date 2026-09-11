@@ -81,3 +81,4 @@ grant execute on function public.can_use_premium_feature() to authenticated;
 grant execute on function public.can_create_application() to authenticated;
 
 alter publication supabase_realtime add table public.subscriptions;
+alter publication supabase_realtime add table public.job_applications;

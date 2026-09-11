@@ -3,47 +3,71 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'application_repository.dart';
 import 'applications_page.dart';
+import 'auth_page.dart';
 import 'plans_page.dart';
 import 'subscription_repository.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
-  const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
-  SubscriptionRepository? subscriptionRepository;
-  if (supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty) {
-    await Supabase.initialize(url: supabaseUrl, publishableKey: supabaseAnonKey);
-    subscriptionRepository = SubscriptionRepository(Supabase.instance.client);
+  const url = String.fromEnvironment('SUPABASE_URL');
+  const key = String.fromEnvironment('SUPABASE_ANON_KEY');
+  if (url.isNotEmpty && key.isNotEmpty) {
+    await Supabase.initialize(url: url, publishableKey: key);
   }
-  runApp(AiJobAssistantApp(subscriptionRepository: subscriptionRepository));
+  runApp(AiJobAssistantApp(client: url.isEmpty || key.isEmpty ? null : Supabase.instance.client));
 }
 
 class AiJobAssistantApp extends StatelessWidget {
-  const AiJobAssistantApp({super.key, this.subscriptionRepository});
+  const AiJobAssistantApp({super.key, this.client});
 
-  final SubscriptionRepository? subscriptionRepository;
+  final SupabaseClient? client;
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'AI Job Assistant',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF0A7265),
+  Widget build(BuildContext context) => MaterialApp(
+    debugShowCheckedModeBanner: false,
+    title: 'AI Job Assistant',
+    theme: ThemeData(
+      colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0A7265)),
+      scaffoldBackgroundColor: const Color(0xFFF6F7F4),
+      useMaterial3: true,
+    ),
+    home: client == null ? const BackendSetupPage() : AuthGate(client: client!),
+  );
+}
+
+class AuthGate extends StatelessWidget {
+  const AuthGate({super.key, required this.client});
+
+  final SupabaseClient client;
+
+  @override
+  Widget build(BuildContext context) => StreamBuilder<AuthState>(
+    stream: client.auth.onAuthStateChange,
+    builder: (context, _) => client.auth.currentSession == null ? AuthPage(client: client) : HomePage(client: client),
+  );
+}
+
+class BackendSetupPage extends StatelessWidget {
+  const BackendSetupPage({super.key});
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    body: Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 540),
+        child: const Padding(
+          padding: EdgeInsets.all(24),
+          child: Text('Configure SUPABASE_URL e SUPABASE_ANON_KEY para conectar sua conta, candidaturas e assinaturas.', textAlign: TextAlign.center),
         ),
-        scaffoldBackgroundColor: const Color(0xFFF6F7F4),
-        useMaterial3: true,
       ),
-      home: HomePage(subscriptionRepository: subscriptionRepository),
-    );
-  }
+    ),
+  );
 }
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key, this.subscriptionRepository});
+  const HomePage({super.key, required this.client});
 
-  final SubscriptionRepository? subscriptionRepository;
+  final SupabaseClient client;
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -51,135 +75,81 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
-  final ApplicationRepository _applicationRepository = ApplicationRepository();
+  late final ApplicationRepository _applications = ApplicationRepository(widget.client);
+  late final SubscriptionRepository _subscriptions = SubscriptionRepository(widget.client);
 
-  @override
-  void dispose() {
-    _applicationRepository.dispose();
-    super.dispose();
-  }
+  static const _destinations = [
+    (Icons.space_dashboard_outlined, Icons.space_dashboard, 'Inicio'),
+    (Icons.work_outline, Icons.work, 'Candidaturas'),
+    (Icons.description_outlined, Icons.description, 'Documentos'),
+    (Icons.person_outline, Icons.person, 'Perfil'),
+    (Icons.workspace_premium_outlined, Icons.workspace_premium, 'Planos'),
+  ];
 
   @override
   Widget build(BuildContext context) {
-    final screens = [
+    final pages = [
       const DashboardPage(),
-      ApplicationsPage(repository: _applicationRepository),
-      _comingSoon('Documentos'),
+      ApplicationsPage(repository: _applications),
+      const _ComingSoonPage(title: 'Documentos'),
       const ProfilePage(),
-      PlansPage(repository: widget.subscriptionRepository),
+      PlansPage(repository: _subscriptions),
     ];
-
-    return Scaffold(
-      body: IndexedStack(index: _selectedIndex, children: screens),
-      floatingActionButton: _selectedIndex == 0
-          ? FloatingActionButton.extended(
-              onPressed: () => _showMessage('Adicao de candidatura em breve.'),
-              icon: const Icon(Icons.add),
-              label: const Text('Adicionar'),
-            )
-          : null,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) => setState(() => _selectedIndex = index),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.space_dashboard_outlined), selectedIcon: Icon(Icons.space_dashboard), label: 'Inicio'),
-          NavigationDestination(icon: Icon(Icons.work_outline), selectedIcon: Icon(Icons.work), label: 'Candidaturas'),
-          NavigationDestination(icon: Icon(Icons.description_outlined), selectedIcon: Icon(Icons.description), label: 'Documentos'),
-          NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Perfil'),
-          NavigationDestination(icon: Icon(Icons.workspace_premium_outlined), selectedIcon: Icon(Icons.workspace_premium), label: 'Planos'),
-        ],
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 720;
+        final content = IndexedStack(index: _selectedIndex, children: pages);
+        return Scaffold(
+          body: compact ? content : Row(children: [
+            NavigationRail(
+              selectedIndex: _selectedIndex,
+              labelType: NavigationRailLabelType.all,
+              onDestinationSelected: _select,
+              destinations: _destinations.map((item) => NavigationRailDestination(icon: Icon(item.$1), selectedIcon: Icon(item.$2), label: Text(item.$3))).toList(),
+            ),
+            const VerticalDivider(width: 1),
+            Expanded(child: content),
+          ]),
+          bottomNavigationBar: compact
+              ? NavigationBar(
+                  selectedIndex: _selectedIndex,
+                  onDestinationSelected: _select,
+                  destinations: _destinations.map((item) => NavigationDestination(icon: Icon(item.$1), selectedIcon: Icon(item.$2), label: item.$3)).toList(),
+                )
+              : null,
+        );
+      },
     );
   }
 
-  Widget _comingSoon(String title) => Center(child: Text(title, style: Theme.of(context).textTheme.titleLarge));
-
-  void _showMessage(String message) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  void _select(int index) => setState(() => _selectedIndex = index);
 }
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 18, 20, 112),
-        children: [
-          Row(
-            children: [
-              const CircleAvatar(
-                radius: 25,
-                backgroundImage: AssetImage('web/icons/Neon Tech Portrait Avatar.png'),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Ola, Camille', style: Theme.of(context).textTheme.headlineSmall),
-                    const SizedBox(height: 4),
-                    Text('Sua busca esta ganhando ritmo.', style: Theme.of(context).textTheme.bodyMedium),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 28),
-          Text('Esta semana', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(color: colorScheme.primary, borderRadius: BorderRadius.circular(8)),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('3 acoes concluidas de 5', style: TextStyle(color: colorScheme.onPrimary, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 14),
-                LinearProgressIndicator(value: 0.6, minHeight: 8, color: const Color(0xFFE6B75F), backgroundColor: colorScheme.onPrimary.withValues(alpha: 0.22)),
-                const SizedBox(height: 12),
-                Text('Faltam duas acoes para a sua meta.', style: TextStyle(color: colorScheme.onPrimary.withValues(alpha: 0.86))),
-              ],
-            ),
-          ),
-          const SizedBox(height: 28),
-          Text('A tratar', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 12),
-          const ApplicationCard(company: 'Atelier Nova', role: 'Product Designer', detail: 'Entrevista amanha, 10:00', color: Color(0xFFE6B75F)),
-          const SizedBox(height: 10),
-          const ApplicationCard(company: 'Metrik', role: 'UX/UI Designer', detail: 'Follow-up na sexta-feira', color: Color(0xFF93B9F5)),
-          const SizedBox(height: 10),
-          const ApplicationCard(company: 'Lumen Studio', role: 'Brand Designer', detail: 'Candidatura ate 18 set.', color: Color(0xFFE89B8C)),
-        ],
+  Widget build(BuildContext context) => SafeArea(
+    child: Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 900),
+        child: ListView(padding: const EdgeInsets.all(24), children: [
+          Text('AI Job Assistant', style: Theme.of(context).textTheme.headlineMedium),
+          const SizedBox(height: 8),
+          const Text('Organize candidaturas, acompanhe oportunidades e desenvolva seu perfil profissional.'),
+        ]),
       ),
-    );
-  }
+    ),
+  );
 }
 
-class ApplicationCard extends StatelessWidget {
-  const ApplicationCard({super.key, required this.company, required this.role, required this.detail, required this.color});
+class _ComingSoonPage extends StatelessWidget {
+  const _ComingSoonPage({required this.title});
 
-  final String company;
-  final String role;
-  final String detail;
-  final Color color;
+  final String title;
 
   @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(8),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: CircleAvatar(backgroundColor: color, child: Text(company.substring(0, 1))),
-        title: Text(company),
-        subtitle: Text('$role\n$detail'),
-        isThreeLine: true,
-        trailing: const Icon(Icons.chevron_right),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Center(child: Text(title, style: Theme.of(context).textTheme.titleLarge));
 }
 
 class ProfilePage extends StatefulWidget {
@@ -193,130 +163,52 @@ class _ProfilePageState extends State<ProfilePage> {
   final Set<String> _cloudSkills = {};
   final Map<String, String?> _answers = {};
 
-  static const cloudOptions = [
+  static const _cloudOptions = [
     'Azure: App Service, Functions, Service Bus, Event Grid, Key Vault, Blob Storage, Application Insights',
     'AWS: ECS, EC2, S3, Lambda, RDS, Developer Tools',
     'GCP: Cloud Run, Compute Engine, Cloud SQL',
     'Kubernetes: AKS, EKS, GKE',
   ];
 
-  static const questions = [
-    _Question('CI/CD', 'Qual sua familiaridade com pipelines de CI/CD?', [
-      'Nunca utilizei CI/CD',
-      'Acompanho pipelines criados por outras pessoas',
-      'Configuro pipelines simples: build, test e deploy basico',
-      'Trabalho com pipelines, ambientes dev/staging/prod e gates de qualidade',
-      'Configuro quality gates, blue-green, canary e rollback automatizado',
-    ]),
-    _Question('Testes', 'Qual sua experiencia com testes?', [
-      'Escrevo testes pontuais apenas quando exigido pelo time',
-      'Escrevo testes unitarios como rotina, sem integracao ou API',
-      'Escrevo testes unitarios, integracao e API desde o desenho da solucao',
-      'Pratico TDD em cenarios criticos e uso cobertura como parte do design',
-    ]),
-    _Question('Docker', 'Qual sua experiencia com Docker e containerizacao?', [
-      'Nunca utilizei Docker',
-      'Uso Docker apenas para rodar projetos localmente com docker-compose up',
-      'Crio Dockerfiles, multi-stage builds e otimizo imagens para producao',
-      'Trabalho com orquestracao, health checks, resource limits e redes',
-      'Configuro build de imagens, seguranca de containers e otimizacao avancada',
-    ]),
-    _Question('PostgreSQL', 'Qual sua experiencia com PostgreSQL ou bancos relacionais?', [
-      'Apenas CRUD basico com ORM',
-      'Modelo tabelas e escrevo queries sem foco em performance',
-      'Faco modelagem, indices, planos de execucao e otimizacao de queries',
-      'Desenhei schemas, particionamento, replicas e escalabilidade',
-      'Faco tuning, migracoes zero-downtime e monitoramento de queries lentas',
-    ]),
-    _Question('Observabilidade', 'Qual sua experiencia com observabilidade e monitoramento?', [
-      'Configuro logs estruturados, metricas basicas e alertas simples',
-      'Trabalho com APM, tracing distribuido e metricas customizadas',
-      'Desenho observabilidade com RED/USE, SLOs, dashboards e post-mortems',
-    ]),
-    _Question('Eventos', 'Qual sua experiencia com arquitetura orientada a eventos e mensageria?', [
-      'Trabalho com Service Bus, Event Grid, RabbitMQ ou Kafka em integracoes',
-      'Desenho arquitetura event-driven com CQRS, DLQ e idempotencia',
-      'Implemento streaming e processamento assincrono em larga escala',
-    ]),
+  static const _questions = [
+    ('CI/CD', 'Qual sua familiaridade com pipelines de CI/CD?', ['Nunca utilizei CI/CD', 'Acompanho pipelines criados por outras pessoas', 'Configuro pipelines simples: build, test e deploy basico', 'Trabalho com pipelines, ambientes dev/staging/prod e gates de qualidade', 'Configuro quality gates, blue-green, canary e rollback automatizado']),
+    ('Testes', 'Qual sua experiencia com testes?', ['Escrevo testes pontuais apenas quando exigido pelo time', 'Escrevo testes unitarios como rotina, sem integracao ou API', 'Escrevo testes unitarios, integracao e API desde o desenho da solucao', 'Pratico TDD em cenarios criticos e uso cobertura como parte do design']),
+    ('Docker', 'Qual sua experiencia com Docker e containerizacao?', ['Nunca utilizei Docker', 'Uso Docker apenas para rodar projetos localmente com docker-compose up', 'Crio Dockerfiles, multi-stage builds e otimizo imagens para producao', 'Trabalho com orquestracao, health checks, resource limits e redes', 'Configuro build de imagens, seguranca de containers e otimizacao avancada']),
+    ('PostgreSQL', 'Qual sua experiencia com PostgreSQL ou bancos relacionais?', ['Apenas CRUD basico com ORM', 'Modelo tabelas e escrevo queries sem foco em performance', 'Faco modelagem, indices, planos de execucao e otimizacao de queries', 'Desenhei schemas, particionamento, replicas e escalabilidade', 'Faco tuning, migracoes zero-downtime e monitoramento de queries lentas']),
+    ('Observabilidade', 'Qual sua experiencia com observabilidade e monitoramento?', ['Configuro logs estruturados, metricas basicas e alertas simples', 'Trabalho com APM, tracing distribuido e metricas customizadas', 'Desenho observabilidade com RED/USE, SLOs, dashboards e post-mortems']),
+    ('Eventos', 'Qual sua experiencia com arquitetura orientada a eventos e mensageria?', ['Trabalho com Service Bus, Event Grid, RabbitMQ ou Kafka em integracoes', 'Desenho arquitetura event-driven com CQRS, DLQ e idempotencia', 'Implemento streaming e processamento assincrono em larga escala']),
   ];
 
   @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 18, 20, 32),
-        children: [
-          Row(
-            children: [
-              const CircleAvatar(
-                radius: 30,
-                backgroundImage: AssetImage('web/icons/Neon Tech Portrait Avatar.png'),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Perfil tecnico', style: Theme.of(context).textTheme.headlineSmall),
-                    const SizedBox(height: 4),
-                    Text('Informe suas experiencias para receber oportunidades mais relevantes.', style: Theme.of(context).textTheme.bodyMedium),
-                  ],
-                ),
-              ),
-            ],
-          ),
+  Widget build(BuildContext context) => SafeArea(
+    child: Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 900),
+        child: ListView(padding: const EdgeInsets.all(24), children: [
+          const CircleAvatar(radius: 32, backgroundImage: AssetImage('web/icons/Neon Tech Portrait Avatar.png')),
+          const SizedBox(height: 16),
+          Text('Perfil tecnico', style: Theme.of(context).textTheme.headlineSmall),
+          const SizedBox(height: 8),
+          const Text('Mantenha suas experiencias atualizadas para receber oportunidades mais relevantes.'),
           const SizedBox(height: 24),
           Text('Cloud e ambientes de deploy', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
-          ...cloudOptions.map((skill) => CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
-                controlAffinity: ListTileControlAffinity.leading,
-                value: _cloudSkills.contains(skill),
-                title: Text(skill),
-                onChanged: (selected) => setState(() => selected == true ? _cloudSkills.add(skill) : _cloudSkills.remove(skill)),
-              )),
+          ..._cloudOptions.map((skill) => CheckboxListTile(contentPadding: EdgeInsets.zero, controlAffinity: ListTileControlAffinity.leading, value: _cloudSkills.contains(skill), title: Text(skill), onChanged: (selected) => setState(() => selected == true ? _cloudSkills.add(skill) : _cloudSkills.remove(skill)))),
           const Divider(height: 32),
-          ...questions.map((question) => _ExperienceField(
-                question: question,
-                value: _answers[question.id],
-                onChanged: (value) => setState(() => _answers[question.id] = value),
-              )),
-          const SizedBox(height: 4),
+          ..._questions.map((question) => Padding(
+            padding: const EdgeInsets.only(bottom: 20),
+            child: DropdownButtonFormField<String>(
+              initialValue: _answers[question.$1],
+              isExpanded: true,
+              decoration: InputDecoration(labelText: question.$2, border: const OutlineInputBorder()),
+              items: question.$3.map((option) => DropdownMenuItem(value: option, child: Text(option, maxLines: 2, overflow: TextOverflow.ellipsis))).toList(),
+              onChanged: (value) => setState(() => _answers[question.$1] = value),
+            ),
+          )),
           FilledButton.icon(onPressed: _save, icon: const Icon(Icons.check), label: const Text('Salvar experiencias')),
-        ],
+        ]),
       ),
-    );
-  }
+    ),
+  );
 
   void _save() => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Experiencias salvas no seu perfil.')));
-}
-
-class _ExperienceField extends StatelessWidget {
-  const _ExperienceField({required this.question, required this.value, required this.onChanged});
-
-  final _Question question;
-  final String? value;
-  final ValueChanged<String?> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 22),
-      child: DropdownButtonFormField<String>(
-        initialValue: value,
-        isExpanded: true,
-        decoration: InputDecoration(labelText: question.label, border: const OutlineInputBorder()),
-        items: question.options.map((option) => DropdownMenuItem(value: option, child: Text(option, maxLines: 2, overflow: TextOverflow.ellipsis))).toList(),
-        onChanged: onChanged,
-      ),
-    );
-  }
-}
-
-class _Question {
-  const _Question(this.id, this.label, this.options);
-
-  final String id;
-  final String label;
-  final List<String> options;
 }
