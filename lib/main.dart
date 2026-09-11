@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'application_repository.dart';
+import 'applications_page.dart';
+
 void main() => runApp(const AiJobAssistantApp());
 
 class AiJobAssistantApp extends StatelessWidget {
@@ -31,13 +34,25 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
+  final ApplicationRepository _applicationRepository = ApplicationRepository();
+
+  @override
+  void dispose() {
+    _applicationRepository.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final screens = [const DashboardPage(), _comingSoon('Candidaturas'), _comingSoon('Documentos'), const ProfilePage()];
+    final screens = [
+      const DashboardPage(),
+      ApplicationsPage(repository: _applicationRepository),
+      _comingSoon('Documentos'),
+      const ProfilePage(),
+    ];
 
     return Scaffold(
-      body: screens[_selectedIndex],
+      body: IndexedStack(index: _selectedIndex, children: screens),
       floatingActionButton: _selectedIndex == 0
           ? FloatingActionButton.extended(
               onPressed: () => _showMessage('Adicao de candidatura em breve.'),
