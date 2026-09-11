@@ -1,35 +1,19 @@
 {
-    "name": "ai_job_assistant",
-    "short_name": "ai_job_assistant",
+    "name": "AI Job Assistant",
+    "short_name": "AI Job",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#F6F7F4",
+    "theme_color": "#0A7265",
+    "description": "Application de suivi de candidatures et de profil technique.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
         {
-            "src": "icons/Icon-192.png",
-            "sizes": "192x192",
-            "type": "image/png"
-        },
-        {
-            "src": "icons/Icon-512.png",
-            "sizes": "512x512",
-            "type": "image/png"
-        },
-        {
-            "src": "icons/Icon-maskable-192.png",
-            "sizes": "192x192",
+            "src": "icons/Neon%20Tech%20Portrait%20Avatar.png",
+            "sizes": "any",
             "type": "image/png",
-            "purpose": "maskable"
-        },
-        {
-            "src": "icons/Icon-maskable-512.png",
-            "sizes": "512x512",
-            "type": "image/png",
-            "purpose": "maskable"
+            "purpose": "any maskable"
         }
     ]
 }
