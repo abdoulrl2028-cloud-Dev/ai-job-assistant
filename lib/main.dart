@@ -73,9 +73,25 @@ class DashboardPage extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 18, 20, 112),
         children: [
-          Text('Ola, Camille', style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 4),
-          Text('Sua busca esta ganhando ritmo.', style: Theme.of(context).textTheme.bodyMedium),
+          Row(
+            children: [
+              const CircleAvatar(
+                radius: 25,
+                backgroundImage: AssetImage('web/icons/Neon Tech Portrait Avatar.png'),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Ola, Camille', style: Theme.of(context).textTheme.headlineSmall),
+                    const SizedBox(height: 4),
+                    Text('Sua busca esta ganhando ritmo.', style: Theme.of(context).textTheme.bodyMedium),
+                  ],
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 28),
           Text('Esta semana', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 12),
@@ -196,9 +212,25 @@ class _ProfilePageState extends State<ProfilePage> {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 18, 20, 32),
         children: [
-          Text('Perfil tecnico', style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 6),
-          Text('Informe suas experiencias para receber oportunidades mais relevantes.', style: Theme.of(context).textTheme.bodyMedium),
+          Row(
+            children: [
+              const CircleAvatar(
+                radius: 30,
+                backgroundImage: AssetImage('web/icons/Neon Tech Portrait Avatar.png'),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Perfil tecnico', style: Theme.of(context).textTheme.headlineSmall),
+                    const SizedBox(height: 4),
+                    Text('Informe suas experiencias para receber oportunidades mais relevantes.', style: Theme.of(context).textTheme.bodyMedium),
+                  ],
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 24),
           Text('Cloud e ambientes de deploy', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
