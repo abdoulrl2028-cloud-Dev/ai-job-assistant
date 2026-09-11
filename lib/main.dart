@@ -1,12 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'application_repository.dart';
 import 'applications_page.dart';
+import 'plans_page.dart';
+import 'subscription_repository.dart';
 
-void main() => runApp(const AiJobAssistantApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
+  const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+  SubscriptionRepository? subscriptionRepository;
+  if (supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty) {
+    await Supabase.initialize(url: supabaseUrl, publishableKey: supabaseAnonKey);
+    subscriptionRepository = SubscriptionRepository(Supabase.instance.client);
+  }
+  runApp(AiJobAssistantApp(subscriptionRepository: subscriptionRepository));
+}
 
 class AiJobAssistantApp extends StatelessWidget {
-  const AiJobAssistantApp({super.key});
+  const AiJobAssistantApp({super.key, this.subscriptionRepository});
+
+  final SubscriptionRepository? subscriptionRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -20,13 +35,15 @@ class AiJobAssistantApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFFF6F7F4),
         useMaterial3: true,
       ),
-      home: const HomePage(),
+      home: HomePage(subscriptionRepository: subscriptionRepository),
     );
   }
 }
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  const HomePage({super.key, this.subscriptionRepository});
+
+  final SubscriptionRepository? subscriptionRepository;
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -49,6 +66,7 @@ class _HomePageState extends State<HomePage> {
       ApplicationsPage(repository: _applicationRepository),
       _comingSoon('Documentos'),
       const ProfilePage(),
+      PlansPage(repository: widget.subscriptionRepository),
     ];
 
     return Scaffold(
@@ -68,6 +86,7 @@ class _HomePageState extends State<HomePage> {
           NavigationDestination(icon: Icon(Icons.work_outline), selectedIcon: Icon(Icons.work), label: 'Candidaturas'),
           NavigationDestination(icon: Icon(Icons.description_outlined), selectedIcon: Icon(Icons.description), label: 'Documentos'),
           NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Perfil'),
+          NavigationDestination(icon: Icon(Icons.workspace_premium_outlined), selectedIcon: Icon(Icons.workspace_premium), label: 'Planos'),
         ],
       ),
     );
