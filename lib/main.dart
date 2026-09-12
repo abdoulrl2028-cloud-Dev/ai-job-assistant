@@ -4,8 +4,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'application_repository.dart';
 import 'applications_page.dart';
 import 'auth_page.dart';
+import 'documents_page.dart';
+import 'job_repository.dart';
+import 'jobs_page.dart';
 import 'plans_page.dart';
 import 'subscription_repository.dart';
+import 'resume_repository.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -77,9 +81,12 @@ class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
   late final ApplicationRepository _applications = ApplicationRepository(widget.client);
   late final SubscriptionRepository _subscriptions = SubscriptionRepository(widget.client);
+  late final JobRepository _jobs = JobRepository(widget.client);
+  late final ResumeRepository _resumes = ResumeRepository(widget.client);
 
   static const _destinations = [
     (Icons.space_dashboard_outlined, Icons.space_dashboard, 'Inicio'),
+    (Icons.travel_explore_outlined, Icons.travel_explore, 'Vagas'),
     (Icons.work_outline, Icons.work, 'Candidaturas'),
     (Icons.description_outlined, Icons.description, 'Documentos'),
     (Icons.person_outline, Icons.person, 'Perfil'),
@@ -90,8 +97,9 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final pages = [
       const DashboardPage(),
+      JobsPage(repository: _jobs, resumeRepository: _resumes),
       ApplicationsPage(repository: _applications),
-      const _ComingSoonPage(title: 'Documentos'),
+      DocumentsPage(repository: _resumes),
       const ProfilePage(),
       PlansPage(repository: _subscriptions),
     ];
@@ -141,15 +149,6 @@ class DashboardPage extends StatelessWidget {
       ),
     ),
   );
-}
-
-class _ComingSoonPage extends StatelessWidget {
-  const _ComingSoonPage({required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) => Center(child: Text(title, style: Theme.of(context).textTheme.titleLarge));
 }
 
 class ProfilePage extends StatefulWidget {
