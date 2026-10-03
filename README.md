@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/abdoulrl2028-cloud-Dev/abdoulrl2028-cloud-Dev/main/assets/projects/ai-jobs.jpg" alt="AI Job Assistant" width="100%">
+</p>
+
 # AI Job Assistant
 
 Plataforma Flutter internacional para encontrar vagas, manter CVs privados, acompanhar candidaturas e preparar fluxos de IA no backend.
